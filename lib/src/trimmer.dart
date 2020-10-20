@@ -151,15 +151,11 @@ class Trimmer {
   /// video format is passed in [customVideoFormat], then the app may
   /// crash.
   ///
-  Future<String> saveTrimmedVideo({
-    @required double startValue,
-    @required double endValue,
-    bool applyVideoEncoding = false,
+  Future<String> saveEditedVideo({
+    double startValue,
+    double endValue,
+    bool includeAudio,
     FileFormat outputFormat,
-    String ffmpegCommand,
-    String customVideoFormat,
-    int fpsGIF,
-    int scaleGIF,
     String videoFolderName,
     String videoFileName,
     StorageDir storageDir,
@@ -201,12 +197,6 @@ class Trimmer {
       () => print("Retrieved Trimmer folder"),
     );
 
-    Duration startPoint = Duration(milliseconds: startValue.toInt());
-    Duration endPoint = Duration(milliseconds: endValue.toInt());
-
-    // Checking the start and end point strings
-    print("Start: ${startPoint.toString()} & End: ${endPoint.toString()}");
-
     print(path);
 
     if (outputFormat == null) {
@@ -217,33 +207,31 @@ class Trimmer {
       _outputFormatString = outputFormat.toString();
     }
 
-    String _trimLengthCommand = ' -ss $startPoint -i "$_videoPath" -t ${endPoint - startPoint}';
+    String _startCommand;
 
-    if (ffmpegCommand == null) {
-      _command = '$_trimLengthCommand -c:a copy ';
+    if (startValue != null && endValue != null) {
+      Duration startPoint = Duration(milliseconds: startValue.toInt());
+      Duration endPoint = Duration(milliseconds: endValue.toInt());
+      // Checking the start and end point strings
+      print("Start: ${startPoint.toString()} & End: ${endPoint.toString()}");
 
-      if (!applyVideoEncoding) {
-        _command += '-c:v copy ';
-      }
-
-      if (outputFormat == FileFormat.gif) {
-        if (fpsGIF == null) {
-          fpsGIF = 10;
-        }
-        if (scaleGIF == null) {
-          scaleGIF = 480;
-        }
-        _command =
-            '$_trimLengthCommand -vf "fps=$fpsGIF,scale=$scaleGIF:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 ';
-      }
+      _startCommand =
+          ' -ss $startPoint -i "$_videoPath" -t ${endPoint - startPoint}';
     } else {
-      _command = '$_trimLengthCommand $ffmpegCommand ';
-      _outputFormatString = customVideoFormat;
+      _startCommand = ' -i "$_videoPath"';
+    }
+
+    _command = '$_startCommand -c:a copy -c:v copy ';
+
+    if (!includeAudio) {
+      _command += '-an ';
     }
 
     _outputPath = '$path$videoFileName$_outputFormatString';
 
     _command += '"$_outputPath"';
+
+    print(_command);
 
     await _flutterFFmpeg.execute(_command).whenComplete(() {
       print('Got value');
